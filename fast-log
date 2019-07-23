@@ -1,0 +1,465 @@
+#!/bin/bash
+__help(){
+	echo "Usage: ${CMD_NAME} [--config [OPTION] [--force]]"
+	echo "       ${CMD_NAME} [-c|--content] CONTENTS"
+	echo "       ${CMD_NAME} --clean"
+	echo "       ${CMD_NAME} -d|--default"
+	echo "       ${CMD_NAME} -h|--help"
+	echo "       ${CMD_NAME} -o|--open"
+	echo "This script is used to take fast notes, with formatted time together."
+	echo ""
+	echo "General options:"
+	echo "  -c, --content CONTENTS       Specify the content to be printed. Can be used to"
+	echo "                               avoid ambiguous arguments"
+	echo "      --config                 When any of the options valid for this option is"
+	echo "                               specified with a new value, configure the"
+	echo "                               specified settings. Two special options are used"
+	echo "                               to specify how the script behaves when invalid"
+	echo "                               values specified. Other options are used to"
+	echo "                               specify which settings to be printed"
+	echo "      --clean                  Clean the log file (delete the contents)"
+	echo "  -d, --default                Set editor name and log filename to default"
+	echo "  -h, --help                   Show this help information"
+	echo "  -o, --open                   Open the log file with the specified editor"
+	echo ""
+	echo "Options following '--config':"
+	echo "  -a, --abort                  Abort when the specified file or editor does not"
+	echo "                               exist, without asking the user"
+	echo "  -f, --file[=FILENAME]        If FILENAME is specified, set the log file to"
+	echo "                               FILENAME. Otherwise, print the current log file"
+	echo "                               name"
+	echo "      --force                  Force set settings, even if the file doesn't"
+	echo "                               exist. For the option '-f|--file=FILENAME', a new"
+	echo "                               file will be created if possible"
+	echo "  -e, --editor[=EDITOR]        If EDITOR is specified, set the default editor"
+	echo "                               to EDITOR. Otherwise, print the current editor"
+	echo "                               name"
+	echo "  -p, --path                   Print the config file path"
+	echo "'-a|--abort' and '--force' must appear before any other options, or an"
+	echo "'unrecognized option' error will be reported. '-a|--abort' and '--force' cannot"
+	echo "appear together, or an 'unrecognized option' error will be reported. If none of"
+	echo "them is specified, this script will ask the user whether the new settings should"
+	echo "be accepted. If '-a|--abort' is specified, this script will return 1 with no"
+	echo "output if invalid values are detected. If only '-a|--abort' or '--force' is"
+	echo "specified, this script will return 0 with doing nothing. If there is repeated"
+	echo "options with different values (e.g. --config -f=A -f=B), only the last one will"
+	echo "be accepted, no matter whether the last value is a valid one, even if there is"
+	echo "another repeated option specifying a valid value. If '-a|--abort' is specified,"
+	echo "and a invalid log file is specified, the '-e|--editor' option will always be"
+	echo "ignored, even if it specifies a valid value. If a null value is specified (e.g."
+	echo "--config -f=), the corresponding setting will not be modified. If some of"
+	echo "repeated options are specified with new values and some ones not (e.g. --config"
+	echo "-f=A -f), the ones with no values specified will be ignored, even if the"
+	echo "specified value is null. If neither '--force' nor '-a|--abort' is specified,"
+	echo "cancellations by user input will cause no errors."
+	echo ""
+	echo "When '--config' is specified, and any of the valid following options is"
+	echo "specified with no new value, options with no new values will be printed, options"
+	echo "with new values will specify the corresponding settings."
+	echo ""
+	echo "If no argument is specified, current settings are printed. This script will"
+	echo "always try to match arguments and parameters in order. If the matching sequence"
+	echo "does not contain the 'CONTENTS' parameter, excess arguments will be ignored."
+	echo "Otherwise, excess arguments will be parsed as contents. Please note that if you"
+	echo "pass the contents with more than one argument, each of the separators will be"
+	echo "treated as a single space (' ')."
+	echo ""
+	echo "Filename and editor name cannot contain '='s, and are stored in a file with the"
+	echo "extension '.conf' with the same name as this script, who is in the subdirectory"
+	echo "named 'config' of the same directory of this script. If a new config file is"
+	echo "needed to be created, it will be created without warnings."
+	echo ""
+	echo "Please note that this script does not check if the editor opened the log file"
+	echo "successfully."
+	echo ""
+	echo "The option '-c|--content' can be omitted usually, but when you want to record"
+	echo "something like '-c', this can be useful. For example, the following command will"
+	echo "print an empty log (but with a timestamp) to your log file:"
+	echo "    $ ${CMD_NAME} -c"
+	echo "You will surely get this in your log:"
+	echo "    [timestamp]"
+	echo "But if you use this:"
+	echo "    $ ${CMD_NAME} -c -c"
+	echo "You will get:"
+	echo "    [timestamp]-c"
+	echo "For '-h' and '--help', this is not necessary, unless you only have '-h' or"
+	echo "'--help' specified:"
+	echo "    $ ${CMD_NAME} -h a"
+	echo "    [timestamp]-h a"
+	echo "    $ ${CMD_NAME} -h"
+	echo "    (This just display the help message)"
+	echo "    $ ${CMD_NAME} -c -h"
+	echo "    [timestamp]-h"
+	echo "    $ ${CMD_NAME} \"-h a\""
+	echo "    [timestamp]-h a"
+	echo "This is the same for '-d' '--default' '-o' '--open'."
+	echo ""
+	echo "Note that these samples show the output to your log file. If the operation"
+	echo "succeed, there should be nothing printed to stdout, unless you specify special"
+	echo "options."
+	echo ""
+	echo "If you meet any problems, record it, report the issue, and try removing the log"
+	echo "file and the config file (if there is one). The config file is at (script"
+	echo "directory)/config/${CMD_NAME}.conf, and the default log file is at ~/user.log."
+	echo ""
+	echo "The log file is created (if necessary) when you specify a message with its"
+	echo "content for the first time, or a '-o' '--open' or '--clean' option is specified."
+	echo ""
+	echo "The config file is created (if necessary) when this script is executed."
+}
+__get_value(){
+	# $1: raw config contents
+	# $2: key
+	echo "$(printf "$1" | grep "$2" | awk -F' = ' '{printf $2}')"
+}
+__init_config(){
+	if [ -f "${CONFIG_DIR}" ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: __init_config: ${SCRIPT_DIR} is not a directory"
+		>&2 echo "Failed to find configuration file"
+		exit 2
+	elif ! [ -d "${CONFIG_DIR}" ]
+	then
+		mkdir "${CONFIG_DIR}"
+		if [ $? -ne 0 ]
+		then
+			>&2 echo "${CMD_NAME}: fatal error: __init_config: mkdir failed"
+			>&2 echo "Failed to create config file"
+			exit 3
+		fi
+	fi
+	echo "file = ${HOME_DIR}/user.log" > "${CONFIG_FILE}"
+	LOG_FILE="${HOME_DIR}/user.log"
+	echo "editor = vi" >> "${CONFIG_FILE}"
+	EDITOR_NAME="vi"
+	if [ $? -ne 0 ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: __init_config: failed to initialize config file"
+		exit 4
+	fi
+}
+__read_config(){
+	if ! [ -f "${CONFIG_FILE}" ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: __read_config: config file not found"
+		>&2 echo "Cannot read settings"
+		exit 5
+	fi
+	RAW_CONFIG="$(cat ${CONFIG_FILE})"
+	LOG_FILE="$(__get_value "${RAW_CONFIG}" "file")"
+	EDITOR_NAME="$(__get_value "${RAW_CONFIG}" "editor")"
+}
+__write_config(){
+	if ! [ -f "${CONFIG_FILE}" ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: __write_config: config file not found"
+		>&2 echo "Cannot write settings"
+		exit 5
+	fi
+	echo "file = ${LOG_FILE}" > "${CONFIG_FILE}"
+	echo "editor = ${EDITOR_NAME}" >> "${CONFIG_FILE}"
+	if [ $? -ne 0 ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: __write_config: echo failed"
+		>$2 echo "Failed to write to config file"
+		exit 6
+	fi
+}
+__set_editor(){
+	# I don't know whether an editor name with ' 's works correctly...
+	# Maybe someone can help with testing?
+	if [ -n "$(which "$1")" ]
+	then
+		EDITOR_NAME="$1"
+		__write_config
+	else
+		if [ "${FORCE_SETTING}" == "1" ]
+		then
+			EDITOR_NAME="$1"
+			__write_config
+		elif [ "${FORCE_SETTING}" == "-1" ]
+		then
+			exit 1
+		else
+			echo "'$1': editor not found"
+			while [ 1 ]
+			do
+				echo "Continue?[Y/n]"
+				read INPUT
+				case "${INPUT}" in
+					[Yy][Ee][Ss] | [Yy])
+						EDITOR_NAME="$1"
+						__write_config
+						break
+					;;
+					[Nn][Oo] | [Nn])
+						echo "Editor not set"
+						break
+					;;
+				esac
+			done
+		fi
+	fi
+}
+__set_logfile(){
+	TMP=""
+	i="0"
+	len="${#1}"
+	until [ "${i}" == "${len}" ]
+	do
+		if [ "${1:${i}:1}" == " " ]
+		then
+			TMP="${TMP}\\"
+		fi
+		TMP="${TMP}${1:${i}:1}"
+		i="$(expr ${i} + 1)"
+	done
+	eval TMP="${TMP}"
+	# These codes are used to ensure the path is available for 'simplify-dir'
+	# I'm not sure whether this has bugs or not :P
+	# This really took me lots of time to make this work
+	if [ "${TMP:0:1}" == "/" ]
+	then
+		FILE_ABS_PATH="${TMP}"
+	else
+		FILE_ABS_PATH="${CWD}/${1}"
+	fi
+	FILE_ABS_PATH="$(simplify-dir "${FILE_ABS_PATH}")"
+	if [ -f "$FILE_ABS_PATH" ]
+	then
+		LOG_FILE="${FILE_ABS_PATH}"
+		__write_config
+	else
+		if [ "${FORCE_SETTING}" == "1" ]
+		then
+			LOG_FILE="${FILE_ABS_PATH}"
+			__write_config
+		elif [ "${FORCE_SETTING}" == "-1" ]
+		then
+			exit 1
+		else
+			echo "'${FILE_ABS_PATH}': file not found"
+			while [ 1 ]
+			do
+				echo "Continue?[Y/n]"
+				read INPUT
+				case "${INPUT}" in
+					[Yy][Ee][Ss] | [Yy])
+						LOG_FILE="${FILE_ABS_PATH}"
+						__write_config
+						break
+					;;
+					[Nn][Oo] | [Nn])
+						echo "Log file not set"
+						break
+					;;
+				esac
+			done
+		fi
+	fi
+}
+__check_log_file(){
+	if ! [ -f "${LOG_FILE}" ]
+	then
+		> "${LOG_FILE}"
+		if [ $? -ne 0 ]
+		then
+			>&2 echo "${CMD_NAME}: fatal error: cannot create ${LOG_FILE}"
+			>&2 echo "Failed to open ${LOG_FILE}"
+			exit 7
+		fi
+	fi
+}
+__check_editor(){
+	if [ -z "$(which ${EDITOR_NAME})" ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: cannot find ${EDITOR_NAME}"
+		>&2 echo "Cannot open the log file"
+		exit 8
+	fi
+}
+
+TIME="$(date +"%Y/%m/%d-%H:%M:%S")"
+CMD_NAME="${0##*/}"
+SETTINGS_READ="0"
+FORCE_SETTING="0"
+CWD="$(pwd)"
+HOME_DIR=~
+if [ "${0:0:1}" == "/" ]
+then
+	SCRIPT_DIR="$(dirname $0)"
+else
+	SCRIPT_DIR="$(dirname $(simplify-dir $(pwd) $0))"
+fi
+CONFIG_DIR="${SCRIPT_DIR}/config"
+CONFIG_FILE="${CONFIG_DIR}/${CMD_NAME}.conf"
+if ! [ -f "${CONFIG_FILE}" ]
+then
+	__init_config
+else
+	__read_config
+fi
+# Initialization
+if [ $# -eq 0 ] || ( [ $# -eq 1 ] && [ "$1" == "--config" ] )
+then
+	echo "file = ${LOG_FILE}"
+	echo "editor = ${EDITOR_NAME}"
+	echo "config file at ${CONFIG_FILE}"
+	exit 0
+elif [ $# -ge 1 ] && ( [ "$1" == '-h' ] || [ "$1" == '--help' ] )
+then
+	__help
+	exit 0
+elif [ $# -eq 1 ] && ( [ "$1" == "-d" ] || [ "$1" == "--default" ] )
+then
+	__init_config
+	exit 0
+elif [ $# -eq 1 ] && [ "$1" == "--clean" ]
+then
+	> "${LOG_FILE}"
+	if [ $? -ne 0 ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: cannot write to ${LOG_FILE}"
+		>&2 echo "Failed to clean log contents"
+		exit 9
+	fi
+	exit 0
+elif [ $# -eq 1 ] && ( [ "$1" == "-o" ] || [ "$1" == "--open" ] )
+then
+	__check_log_file
+	__check_editor
+	"${EDITOR_NAME}" "${LOG_FILE}"
+	exit 0
+elif [ "$1" == "-c" ] || [ "$1" == "--content" ]
+then
+	__check_log_file
+	CONTENTS=""
+	OPTION_SKIPPED="0"
+	for i in "$@"
+	do
+		if [ "${OPTION_SKIPPED}" == "0" ]
+		then
+			OPTION_SKIPPED="1"
+			continue
+		fi
+		CONTENTS="${CONTENTS} ${i}"
+	done
+	CONTENTS="[${TIME}]${CONTENTS# }"
+	echo "${CONTENTS}" >> "${LOG_FILE}"
+	if [ $? -ne 0 ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: echo failed"
+		>&2 echo "Cannot write to ${LOG_FILE}"
+		exit 10
+	fi
+	exit 0
+elif [ "$1" == "--config" ]
+then
+	OPTION_SKIPPED="0"
+	if [ "$2" == "--force" ]
+	then
+		FORCE_SETTING="1"
+		FORCE_OPTION_SKIPPED="0"
+	elif [ "$2" == "-a" ] || [ "$2" == "--abort" ]
+	then
+		FORCE_SETTING="-1"
+		FORCE_OPTION_SKIPPED="0"
+	else
+		FORCE_OPTION_SKIPPED="1"
+	fi
+	PRINT_FILE="0"
+	PRINT_EDITOR="0"
+	PRINT_PATH="0"
+	TMP_LOGFILE=""
+	TMP_EDITOR=""
+	for i in "$@"
+	do
+		if [ "${OPTION_SKIPPED}" == "0" ]
+		then
+			OPTION_SKIPPED="1"
+			continue
+		fi
+		if [ "${FORCE_OPTION_SKIPPED}" == "0" ]
+		then
+			FORCE_OPTION_SKIPPED="1"
+			continue
+		fi
+		if [ "${i}" == "-p" ] || [ "${i}" == "--path" ]
+		then
+			PRINT_PATH="1"
+			continue
+		fi
+		if [ "${i}" == "-f" ] || [ "${i}" == "--file" ]
+		then
+			if [ -z "${TMP_LOGFILE}" ]
+			then
+				PRINT_FILE="1"
+			fi
+			continue
+		fi
+		if [ "${i}" == "-e" ] || [ "${i}" == "--editor" ]
+		then
+			if [ -z "${TMP_EDITOR}" ]
+			then
+				PRINT_EDITOR="1"
+			fi
+			continue
+		fi
+		if [ "${i:0:3}" == "-f=" ]
+		then
+			TMP_LOGFILE="${i#-f=}"
+			PRINT_FILE="0"
+			continue
+		fi
+		if [ "${i:0:7}" == "--file=" ]
+		then
+			TMP_LOGFILE="${i#--file=}"
+			PRINT_FILE="0"
+			continue
+		fi
+		if [ "${i:0:3}" == "-e=" ]
+		then
+			TMP_EDITOR="${i#-e=}"
+			PRINT_EDITOR="0"
+			continue
+		fi
+		if [ "${i:0:9}" == "--editor=" ]
+		then
+			TMP_EDITOR="${i#--editor=}"
+			PRINT_EDITOR="0"
+			continue
+		fi
+		>&2 echo "${CMD_NAME}: unrecognized option '${i}'"
+		>&2 echo "Try '${CMD_NAME} --help' for more information"
+		exit 11
+	done
+	if [ -n "${TMP_LOGFILE}" ]
+	then
+		__set_logfile "${TMP_LOGFILE}"
+	fi
+	if [ -n "${TMP_EDITOR}" ]
+	then
+		__set_editor "${TMP_EDITOR}"
+	fi
+	if [ "${PRINT_FILE}" == "1" ]
+	then
+		echo "file = ${LOG_FILE}"
+	fi
+	if [ "${PRINT_EDITOR}" == "1" ]
+	then
+		echo "editor = ${EDITOR_NAME}"
+	fi
+	if [ "${PRINT_PATH}" == "1" ]
+	then
+		echo "config file at ${CONFIG_FILE}"
+	fi
+	exit 0
+else
+	echo "[${TIME}]$@" >> "${LOG_FILE}"
+	if [ $? -ne 0 ]
+	then
+		>&2 echo "${CMD_NAME}: fatal error: echo failed"
+		>&2 echo "Cannot write to ${LOG_FILE}"
+	fi
+	exit 0
+fi

@@ -1,0 +1,62 @@
+#!/bin/bash
+__help(){
+	echo "Usage: ${CMD_NAME}"
+	echo "       ${CMD_NAME} DIR"
+	echo "This script is used to get the parent directory of a specified directory."
+	echo ""
+	echo "  DIR                          A directory"
+	echo ""
+	echo "This script operates only names. It doesn't matter whether the path exists or"
+	echo "not. If DIR starts with a '/', it will be considered as a absolute directory."
+	echo ""
+	echo "If no option is specified, this help message is showed."
+}
+__calc(){
+# Yeah this is copied from 'simplify-dir' with debug function removed
+	if [ "$2" == "1" ]
+	then
+		if [ "$1" == "/" ]
+		then
+			echo "/"
+		else
+			echo "${1%/*}"
+		fi
+	else
+		if [ "$1" == "." ]
+		then
+			echo ".."
+		elif [ "$1" == "${1%/*}" ]
+		then
+			if [ "$1" != ".." ]
+			then
+				echo "."
+			else
+				echo "../.."
+			fi
+		elif [ "${1:$(expr ${#1} - 3):$(expr ${#1} - 1)}" == "/.." ]
+		then
+			echo "$1/.."
+		else
+			echo "${1%/*}"
+		fi
+	fi
+}
+CMD_NAME="${0##*/}"
+if [ $# -eq 0 ]
+then
+	__help
+	exit 0
+fi
+if [ $# -gt 1 ]
+then
+	>&2 echo "${CMD_NAME}: too much arguments"
+	>&2 echo "Try '${CMD_NAME}' for more information"
+	exit 1
+fi
+if [ "${1:0:1}" == "/" ]
+then
+	__calc "$1" "1"
+else
+	__calc "$1" "0"
+fi
+exit 0

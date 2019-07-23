@@ -1,0 +1,232 @@
+#!/bin/bash
+__help(){
+	echo "Usage: ${CMD_NAME} [-d|--debug] DIR1 [DIR2...]"
+	echo "       ${CMD_NAME} -h|--help"
+	echo "This script is used to combine or simplify directory names."
+	echo ""
+	echo "  -d, --debug                  Print debug inforation to stderr (&2)"
+	echo "  -h, --help                   Show this help information"
+	echo "  DIR1                         A directory"
+	echo "  DIR2...                      Relative directories in order"
+	echo ""
+	echo "This script can combine path names into one, or simplify one complicated path,"
+	echo "but just names. Existing directories won't be modified. Non-existing directories"
+	echo "are also accepted, as long as the directory name is valid."
+	echo ""
+	echo "If DIR1 is started with a '\', this script will output a absolute directory."
+	echo "Otherwise, output a relative directory."
+	echo ""
+	echo "If you have a directory named '-d' or '--debug' as DIR1, Try add a './' prefix."
+	echo "This is not necessary for '-h' and '--help', when there is more than one"
+	echo "argument, it will be automatically parsed as a directory name."
+	echo ""
+	echo "Please note that this script does not check if the directories following DIR1"
+	echo "are relative directories or not. The user is responsible for such validations"
+	echo "if necessary. This script may return an incorrect result without such"
+	echo "validations, but this is not a bug, so please check your arguments to ensure a"
+	echo "correct result."
+	echo ""
+	echo "Usually, this script removes excess, repeating slashes (e.g. 'a//b' is"
+	echo "equivalent to 'a/b'), but there is an exception. If DIR1 starts with exact two"
+	echo "slashes, both of them will be keeped in the result, as how bash process the same"
+	echo "situation."
+	echo ""
+	echo "Eveything should be the same as in bash shell. If not, please contact with the"
+	echo "developer."
+	echo ""
+	echo "For instances,"
+	echo "    $ ${CMD_NAME} . .."
+	echo "    .."
+	echo "    $ ${CMD_NAME} usr/.. bin"
+	echo "    bin"
+	echo "    $ ${CMD_NAME} usr/.. .."
+	echo "    .."
+	echo "    $ ${CMD_NAME} /bin ../.."
+	echo "    /"
+	echo "    $ ${CMD_NAME} ./bin ../.."
+	echo "    .."
+	echo "    $ ${CMD_NAME} /usr bin"
+	echo "    /usr/bin"
+	echo "    $ ${CMD_NAME} usr .. "
+	echo "    ."
+	echo "    $ ${CMD_NAME} /../.. bin"
+	echo "    /bin"
+	echo "    $ ${CMD_NAME} .. .."
+	echo "    ../.."
+	echo "    $ ${CMD_NAME} ../.. a/b/c"
+	echo "    c"
+	echo "    $ ${CMD_NAME} .// a"
+	echo "    a"
+	echo "    $ ${CMD_NAME} ./-d a"
+	echo "    -d/a"
+	echo "    $ ${CMD_NAME} -h a"
+	echo "    -h/a"
+	echo "    $ ${CMD_NAME} ~ bin"
+	echo "    /(your home directory)/bin"
+	echo "    $ ${CMD_NAME} ~ ~"
+	echo "    /(your home directory)(your home directory)"
+	echo "Usually this is because of the shell grammar. Take bash for example, the"
+	echo "character '~' without quotes will be directly parsed as your home directory."
+	echo "If you pass two '~'s, this script does not get the same characters, but"
+	echo "repeated strings of your home directory name."
+}
+__debug(){
+	if [ "${ON_DEBUG_MODE}" == "1" ]
+	then
+		>&2 echo "$@"
+	fi
+}
+# Must not contain excess '/'s or terminating '/'s
+__parent_dir(){
+	if [ "$2" == "1" ]
+	then
+		__debug "__parent_dir: absolute directory"
+		if [ "$1" == "/" ]
+		then
+			__debug "__parent_dir: '/' -> '/'"
+			echo "/"
+		else
+			__debug "__parent_dir: '$1' -> '${1%*/}'"
+			echo "${1%/*}"
+		fi
+	else
+		__debug "__parent_dir: relative directory"
+		if [ "$1" == "." ]
+		then
+			__debug "__parent_dir: '.' -> '..'"
+			echo ".."
+		elif [ "$1" == "${1%/*}" ]
+		then
+			if [ "$1" != ".." ]
+			then
+				__debug "__parent_dir: '$1' -> '.'"
+				echo "."
+			else
+				__debug "__parent_dir: '..' -> '../..'"
+				echo "../.."
+			fi
+		elif [ "${1:$(expr ${#1} - 3):$(expr ${#1} - 1)}" == "/.." ]
+		then
+			__debug "__parent_dir: '$1' -> '$1/..'"
+			echo "$1/.."
+		else
+			__debug "__parent_dir: '$1' -> '${1%*/}'"
+			echo "${1%/*}"
+		fi
+	fi
+}
+__child_dir(){
+	if [ "$1" == ".." ]
+	then
+		__debug "__child_dir: '..' -> '.'"
+		echo "."
+	elif [ "$1" == "." ]
+	then
+		__debug "__child_dir: '.' -> '$2'"
+		echo "$2"
+	elif [ "${1:$(expr ${#1} - 3):$(expr ${#1} - 1)}" == "/.." ]
+	then
+		__debug "__child_dir: '$1' -> '${1%/..}'"
+		echo "${1%/..}"
+	else
+		__debug "__child_dir: '$1' -> '$1/$2'"
+		echo "$1/$2"
+	fi
+}
+__calc(){
+	if [ "${DIR_QUEUE:0:1}" == "/" ]
+	then
+		IS_ABS_DIR="1"
+		CNT_DIR="/"
+		__debug "__calc: absolute directory"
+	else
+		IS_ABS_DIR="0"
+		CNT_DIR="."
+		__debug "__calc: relative directory"
+	fi
+	until [ -z "$DIR_QUEUE" ]
+	do
+		CNT_TOKEN="$(echo ${DIR_QUEUE} | awk -F'/' '{printf $1}')"
+		DIR_QUEUE="${DIR_QUEUE#*/}"
+		__debug "__calc: CNT_TOKEN: ${CNT_TOKEN}"
+		__debug "__calc: DIR_QUEUE: ${DIR_QUEUE}"
+		case "${CNT_TOKEN}" in
+			. | "")
+				continue
+			;;
+			..)
+				CNT_DIR="$(__parent_dir "${CNT_DIR}" "${IS_ABS_DIR}")"  #" # gedit is not parsing this correctly
+			;;
+			*)
+				CNT_DIR="$(__child_dir "${CNT_DIR}" "${CNT_TOKEN}")"  #" # gedit is not parsing this correctly
+			;;
+		esac
+		__debug "__calc: CNT_DIR:   ${CNT_DIR}"
+		__debug ""
+	done
+	if [ "${CNT_DIR:0:2}" == "//" ]
+	then
+		CNT_DIR="${CNT_DIR#/}"
+	fi
+	if [ "${DOUBLE_SLASHES}" == "1" ]
+	then
+		CNT_DIR="/${CNT_DIR}"
+	fi
+	echo "${CNT_DIR}"
+}
+CMD_NAME="${0##*/}"
+if [ $# -eq 0 ]
+then
+	>&2 echo "${CMD_NAME}: missing operand"
+	>&2 echo "Try '${CMD_NAME} --help' for more information"
+	exit 1
+elif [ $# -eq 1 ] && ( [ "$1" == "-h" ] || [ "$1" == "--help" ] )
+then
+	__help
+	exit 0
+else
+	if [ "$1" == "-d" ] || [ "$1" == "--debug" ]
+	then
+		ON_DEBUG_MODE="1"
+		DEBUG_OPTION_SKIPPED="0"
+	else
+		ON_DEBUG_MODE="0"
+		DEBUG_OPTION_SKIPPED="1"
+	fi
+	DIR_QUEUE=""
+	for i in "$@"
+	do
+		if [ "${DEBUG_OPTION_SKIPPED}" == "0" ]
+		then
+			DEBUG_OPTION_SKIPPED="1"
+			continue
+		fi
+		DIR_QUEUE="${DIR_QUEUE}/${i}"
+	done
+	DIR_QUEUE="${DIR_QUEUE#/}/"
+	if [ "${ON_DEBUG_MODE}" == "1" ]
+	then
+		__debug "DIR1: started with '${2:1:2}', followed by '${2:2:1}'"
+		if [ "${2:0:2}" == "//" ] && [ "${2:2:1}" != "/" ]
+		then
+			DOUBLE_SLASHES="1"
+		elif [ "$2" == "//" ]
+		then
+			DOUBLE_SLASHES="1"
+		else
+			DOUBLE_SLASHES="0"
+		fi
+	else
+		if [ "${1:0:2}" == "//" ] && [ "${1:2:1}" != "/" ]
+		then
+			DOUBLE_SLASHES="1"
+		elif [ "$1" == "//" ]
+		then
+			DOUBLE_SLASHES="1"
+		else
+			DOUBLE_SLASHES="0"
+		fi
+	fi
+	__calc
+fi
+exit 0

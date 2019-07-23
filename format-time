@@ -1,0 +1,71 @@
+#!/bin/bash
+__help(){
+	echo "Usage: ${CMD_NAME} [OPTION]"
+	echo "This script is used to get current, formatted time."
+	echo ""
+	echo "  -a, --all                    Get both formatted date and time"
+	echo "  -d, --date                   Get the formatted date"
+	echo "      --day                    Get the day only"
+	echo "  -h, --help                   Show this help information"
+	echo "      --hour                   Get the hour"
+	echo "  -m, --minute                 Get the minute"
+	echo "      --month                  Get the month"
+	echo "  -s, --second                 Get the second"
+	echo "  -t, --time                   Get formatted time"
+	echo "  -y, --year                   Get the year"
+	echo ""
+	echo "Excess arguments will be ignored."
+}
+CMD_NAME="${0##*/}"
+if [ $# -eq 0 ]
+then
+	>&2 echo "${CMD_NAME}: missing operand"
+	>&2 echo "Try '${CMD_NAME} --help' for more information"
+	exit 1
+else
+	case "$1" in
+		-h | --help)
+			__help
+		;;
+		-a | --all)
+			echo `date +"%Y/%m/%d"` `date +"%H:%M:%S"`
+		;;
+		--date)
+			date +"%Y/%m/%d"
+		;;
+		--day)
+			date +"%d"
+		;;
+		--hour)
+			date +"%H"
+		;;
+		--minute)
+			date +"%M"
+		;;
+		--month)
+			date +"%m"
+		;;
+		-s | --second)
+			date +"%S"
+		;;
+		-t | --time)
+			date +"%H:%M:%S"
+		;;
+		-y | --year)
+			date +"%y"
+		;;
+		-d | -m)
+			>&2 echo "${CMD_NAME}: ambiguous option: '$1'"
+			>&2 echo "Try '${CMD_NAME} --help' for more information"
+			exit 2
+		;;
+		*)
+			>&2 echo "${CMD_NAME}: unrecognized option: '$1'"
+			>&2 echo "Try '${CMD_NAME} --help' for more information"
+			exit 3
+		;;
+	esac
+	exit 0
+fi
+exit 4
+#Unexpected branch

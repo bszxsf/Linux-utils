@@ -1,0 +1,26 @@
+#!/bin/bash
+__help(){
+	echo "Usage: ${CMD_NAME}"
+	echo "       ${CMD_NAME} [-h|--help]"
+	echo "This script is used to get a 25*80 console."
+	echo ""
+	echo "  -h, --help                   Show this help information"
+	echo ""
+	echo "Excess arguments will be ignored. If no argument is specified, or invalid"
+	echo "argument specified, it will be ignored."
+	echo ""
+	echo "This script actually calls the 'resize' command. If there is not one, the ANSI"
+	echo "escape sequence will be called. For machines with neither one, this script will"
+	echo "only print some characters."
+}
+CMD_NAME="${0##*/}"
+if [ $# -ge 1 ] && ( [ "$1" == "-h" ] || [ "$1" == "--help" ] )
+then
+	__help
+elif [ -n "$(which resize)" ]
+then
+	resize -s 25 80 1>/dev/null 2>&1
+else
+	printf '\033[8;25;80t'
+fi
+exit 0

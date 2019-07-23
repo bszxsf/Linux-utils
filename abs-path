@@ -1,0 +1,53 @@
+#!/bin/bash
+__help(){
+	echo "Usage: ${CMD_NAME} DIR PATH"
+	echo "       ${CMD_NAME} [-h|--help]"
+	echo "This script is originally designed to help other scripts get their absolute"
+	echo "paths."
+	echo ""
+	echo "  DIR                          A absolute directory name"
+	echo "  -h, --help                   Show this help information"
+	echo "  PATH                         A path, can be either absolute or relative"
+	echo ""
+	echo "This script operates only names. It doesn't matter whether the path exists or"
+	echo "not."
+	echo ""
+	echo "When PATH is absolute, DIR will be ignored. Otherwise, this script combines DIR"
+	echo "and PATH as the result."
+	echo ""
+	echo "To get the absolute path of your script, call this script in yours, and pass"
+	echo "its current working directory (i.e. '\`pwd\`') and the command (i.e. '\$0') as"
+	echo "arguments. This command will usually do the trick:"
+	echo "    $ ${CMD_NAME} \`pwd\` \"\$0\""
+}
+CMD_NAME="${0##*/}"
+if [ $# -eq 1 ] && ( [ "$1" == "-h" ] || [ "$1" == "--help" ] )
+then
+	__help
+	exit 0
+fi
+if [ $# -lt 2 ]
+then
+	>&2 echo "${CMD_NAME}: missing operand"
+	>&2 echo "Try '${CMD_NAME} --help' for more information"
+	exit 1
+fi
+if [ $# -gt 2 ]
+then
+	>&2 echo "${CMD_NAME}: too much arguments"
+	>&2 echo "Try '${CMD_NAME} --help' for more information"
+	exit 2
+fi
+if [ "${1:0:1}" != "/" ]
+then
+	>&2 echo "${CMD_NAME}: DIR must be a absolute directory"
+	>&2 echo "Try '${CMD_NAME} --help' for more information"
+	exit 3
+fi
+if [ "${2:0:1}" == "/" ]
+then
+	simplify-dir "$2"
+else
+	simplify-dir "$1" "$2"
+fi
+exit 0
