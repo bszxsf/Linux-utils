@@ -70,47 +70,32 @@ __help(){
 	echo "If you pass two '~'s, this script does not get the same characters, but"
 	echo "repeated strings of your home directory name."
 }
-__debug(){
-	if [ "${ON_DEBUG_MODE}" == "1" ]
-	then
-		>&2 echo "$@"
-	fi
-}
 # Must not contain excess '/'s or terminating '/'s
 __parent_dir(){
 	if [ "$2" == "1" ]
 	then
-		__debug "__parent_dir: absolute directory"
 		if [ "$1" == "/" ]
 		then
-			__debug "__parent_dir: '/' -> '/'"
 			echo "/"
 		else
-			__debug "__parent_dir: '$1' -> '${1%*/}'"
 			echo "${1%/*}"
 		fi
 	else
-		__debug "__parent_dir: relative directory"
 		if [ "$1" == "." ]
 		then
-			__debug "__parent_dir: '.' -> '..'"
 			echo ".."
 		elif [ "$1" == "${1%/*}" ]
 		then
 			if [ "$1" != ".." ]
 			then
-				__debug "__parent_dir: '$1' -> '.'"
 				echo "."
 			else
-				__debug "__parent_dir: '..' -> '../..'"
 				echo "../.."
 			fi
 		elif [ "${1:$(expr ${#1} - 3):$(expr ${#1} - 1)}" == "/.." ]
 		then
-			__debug "__parent_dir: '$1' -> '$1/..'"
 			echo "$1/.."
 		else
-			__debug "__parent_dir: '$1' -> '${1%*/}'"
 			echo "${1%/*}"
 		fi
 	fi
@@ -118,18 +103,14 @@ __parent_dir(){
 __child_dir(){
 	if [ "$1" == ".." ]
 	then
-		__debug "__child_dir: '..' -> '.'"
 		echo "."
 	elif [ "$1" == "." ]
 	then
-		__debug "__child_dir: '.' -> '$2'"
 		echo "$2"
 	elif [ "${1:$(expr ${#1} - 3):$(expr ${#1} - 1)}" == "/.." ]
 	then
-		__debug "__child_dir: '$1' -> '${1%/..}'"
 		echo "${1%/..}"
 	else
-		__debug "__child_dir: '$1' -> '$1/$2'"
 		echo "$1/$2"
 	fi
 }
@@ -138,18 +119,14 @@ __calc(){
 	then
 		IS_ABS_DIR="1"
 		CNT_DIR="/"
-		__debug "__calc: absolute directory"
 	else
 		IS_ABS_DIR="0"
 		CNT_DIR="."
-		__debug "__calc: relative directory"
 	fi
 	until [ -z "$DIR_QUEUE" ]
 	do
 		CNT_TOKEN="$(echo ${DIR_QUEUE} | awk -F'/' '{printf $1}')"
 		DIR_QUEUE="${DIR_QUEUE#*/}"
-		__debug "__calc: CNT_TOKEN: ${CNT_TOKEN}"
-		__debug "__calc: DIR_QUEUE: ${DIR_QUEUE}"
 		case "${CNT_TOKEN}" in
 			. | "")
 				continue
@@ -161,8 +138,6 @@ __calc(){
 				CNT_DIR="$(__child_dir "${CNT_DIR}" "${CNT_TOKEN}")"  #" # gedit is not parsing this correctly
 			;;
 		esac
-		__debug "__calc: CNT_DIR:   ${CNT_DIR}"
-		__debug ""
 	done
 	if [ "${CNT_DIR:0:2}" == "//" ]
 	then
@@ -185,28 +160,14 @@ then
 	__help
 	exit 0
 else
-	if [ "$1" == "-d" ] || [ "$1" == "--debug" ]
-	then
-		ON_DEBUG_MODE="1"
-		DEBUG_OPTION_SKIPPED="0"
-	else
-		ON_DEBUG_MODE="0"
-		DEBUG_OPTION_SKIPPED="1"
-	fi
 	DIR_QUEUE=""
 	for i in "$@"
 	do
-		if [ "${DEBUG_OPTION_SKIPPED}" == "0" ]
-		then
-			DEBUG_OPTION_SKIPPED="1"
-			continue
-		fi
 		DIR_QUEUE="${DIR_QUEUE}/${i}"
 	done
 	DIR_QUEUE="${DIR_QUEUE#/}/"
 	if [ "${ON_DEBUG_MODE}" == "1" ]
 	then
-		__debug "DIR1: started with '${2:1:2}', followed by '${2:2:1}'"
 		if [ "${2:0:2}" == "//" ] && [ "${2:2:1}" != "/" ]
 		then
 			DOUBLE_SLASHES="1"
