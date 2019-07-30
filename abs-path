@@ -51,3 +51,4 @@ else
 	simplify-dir "$1" "$2"
 fi
 exit 0
+

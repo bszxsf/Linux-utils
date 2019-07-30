@@ -60,3 +60,4 @@ else
 	__calc "$1" "0"
 fi
 exit 0
+
