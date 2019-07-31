@@ -1,9 +1,11 @@
 #!/bin/bash
 __help(){
-	echo "Usage: ${CMD_NAME} [--config [OPTION] [--force]]"
+	echo "Usage: ${CMD_NAME} [--config [--force|-a|--abort] [OPTION]]"
 	echo "       ${CMD_NAME} [-c|--content] CONTENTS"
 	echo "       ${CMD_NAME} --clean"
 	echo "       ${CMD_NAME} -d|--default"
+	echo "       ${CMD_NAME} -e|--editor=EDITOR [OPTION] [-o|--open]"
+	echo "       ${CMD_NAME} -f|--file=FILENAME [OPTION]"
 	echo "       ${CMD_NAME} -h|--help"
 	echo "       ${CMD_NAME} -o|--open"
 	echo "This script is used to take fast notes, with formatted time together."
@@ -19,6 +21,8 @@ __help(){
 	echo "                               specify which settings to be printed"
 	echo "      --clean                  Clean the log file (delete the contents)"
 	echo "  -d, --default                Set editor name and log filename to default"
+	echo "  -e, --editor=EDITOR          Specify which editor to be used with '-o|--open'"
+	echo "  -f, --file=FILENAME          Specify the log files"
 	echo "  -h, --help                   Show this help information"
 	echo "  -o, --open                   Open the log file with the specified editor"
 	echo ""
@@ -52,6 +56,18 @@ __help(){
 	echo "-f=A -f), the ones with no values specified will be ignored, even if the"
 	echo "specified value is null. If neither '--force' nor '-a|--abort' is specified,"
 	echo "cancellations by user input will cause no errors."
+	echo ""
+	echo "Options following '-e|--editor' and '-f|--file':"
+	echo "  -a, --abort                  The same as '-a|--abort' for '--config'"
+	echo "  -f, --force                  The same as '--force' for '--config'"
+	echo "  -o, --open                   Only available  for '-e|--editor'. Try to open"
+	echo "                               the log file with the newly specified editor"
+	echo "  CONTENTS                     Only available for '-f|--file'. Try to write to"
+	echo "                               the newly specified log file"
+	echo "The options '-a|--abort' and '-f|--force' behave exactly the same as"
+	echo "'-a|--abort' and '--force' following '--config', and they follow exactly the"
+	echo "same rules. For instance they cannot appear together, just like the similar"
+	echo "circumstance for '--config'."
 	echo ""
 	echo "When '--config' is specified, and any of the valid following options is"
 	echo "specified with no new value, options with no new values will be printed, options"
@@ -201,7 +217,7 @@ __set_editor(){
 		fi
 	fi
 }
-__set_logfile(){
+__set_log_file(){
 	TMP=""
 	i="0"
 	len="${#1}"
@@ -332,19 +348,10 @@ then
 	exit 0
 elif [ "$1" == "-c" ] || [ "$1" == "--content" ]
 then
+	shift
 	__check_log_file
-	CONTENTS=""
-	OPTION_SKIPPED="0"
-	for i in "$@"
-	do
-		if [ "${OPTION_SKIPPED}" == "0" ]
-		then
-			OPTION_SKIPPED="1"
-			continue
-		fi
-		CONTENTS="${CONTENTS} ${i}"
-	done
-	CONTENTS="[${TIME}]${CONTENTS# }"
+	CONTENTS="$@"
+	CONTENTS="[${TIME}]${CONTENTS}"
 	echo "${CONTENTS}" >> "${LOG_FILE}"
 	if [ $? -ne 0 ]
 	then
@@ -430,7 +437,7 @@ then
 	done
 	if [ -n "${TMP_LOGFILE}" ]
 	then
-		__set_logfile "${TMP_LOGFILE}"
+		__set_log_file "${TMP_LOGFILE}"
 	fi
 	if [ -n "${TMP_EDITOR}" ]
 	then
@@ -449,13 +456,68 @@ then
 		echo "config file at ${CONFIG_FILE}"
 	fi
 	exit 0
+elif [ "${1:0:3}" == "-e=" ] || [ "${1:0:9}" == "--editor=" ]
+then
+	OPEN_OPT="0"
+	__check_log_file
+	[ "${1:0:3}" == "-e=" ] && TMP_EDITOR="${1#-e=}" || TMP_EDITOR="${1#--editor=}"
+	shift
+	if [ $# -gt 0 ] && ( [ "$1" == "-a" ] || [ "$1" == "--abort" ] )
+	then
+		FORCE_SETTING="-1"
+		shift
+	elif [ $# -gt 0 ] && ( [ "$1" == "-f" ] || [ "$1" == "--force" ] )
+	then
+		FORCE_SETTING="1"
+		shift
+	fi
+	if [ $# -gt 0 ] && ( [ "$1" == "-o" ] || [ "$1" == "--open" ] )
+	then
+		OPEN_OPT="1"
+		shift
+	fi
+	if [ $# -gt 0 ]
+	then
+		>&2 echo "${CMD_NAME}: unrecognized option '$1'"
+		>&2 echo "Try '${CMD_NAME} --help' for more information"
+		exit 12
+	fi
+	[ -n "${TMP_EDITOR}" ] && __set_editor "${TMP_EDITOR}"
+	__check_editor
+	__check_log_file
+	"${EDITOR_NAME}" "${LOG_FILE}"
+	exit 0
+elif [ "${1:0:3}" == "-f=" ] || [ "${1:0:7}" == "--file=" ]
+then
+	[ "${1:0:3}" == "-f=" ] && TMP_LOGFILE="${1#-f=}" || TMP_LOGFILE="${1#--file=}"
+	shift
+	if [ $# -gt 0 ] && ( [ "$1" == "-a" ] || [ "$1" == "--abort" ] )
+	then
+		FORCE_SETTING="-1"
+		shift
+	elif [ $# -gt 0 ] && ( [ "$1" == "-f" ] || [ "$1" == "--force" ] )
+	then
+		FORCE_SETTING="1"
+		shift
+	fi
+	if [ $# -gt 0 ]
+	then
+		>&2 echo "${CMD_NAME}: unrecognized option '$1'"
+		>&2 echo "Try '${CMD_NAME} --help' for more information"
+		exit 13
+	fi
+	[ -n "${TMP_LOGFILE}" ] && __set_log_file "${TMP_LOGFILE}"
+	exit 0
 else
 	echo "[${TIME}]$@" >> "${LOG_FILE}"
 	if [ $? -ne 0 ]
 	then
 		>&2 echo "${CMD_NAME}: fatal error: echo failed"
 		>&2 echo "Cannot write to ${LOG_FILE}"
+		exit 14
 	fi
 	exit 0
 fi
+exit 125
+#Unexpected branch
 
