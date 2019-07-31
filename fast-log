@@ -22,7 +22,7 @@ __help(){
 	echo "      --clean                  Clean the log file (delete the contents)"
 	echo "  -d, --default                Set editor name and log filename to default"
 	echo "  -e, --editor=EDITOR          Specify which editor to be used with '-o|--open'"
-	echo "  -f, --file=FILENAME          Specify the log files"
+	echo "  -f, --file=FILENAME          Specify the log file"
 	echo "  -h, --help                   Show this help information"
 	echo "  -o, --open                   Open the log file with the specified editor"
 	echo ""
