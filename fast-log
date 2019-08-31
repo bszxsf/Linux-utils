@@ -528,7 +528,10 @@ then
 	[ -n "${TMP_EDITOR}" ] && __set_editor "${TMP_EDITOR}"
 	__check_editor
 	__check_log_file
-	"${EDITOR_NAME}" "${LOG_FILE}"
+	if [ "${OPEN_OPT}" == "1" ]
+	then
+		"${EDITOR_NAME}" "${LOG_FILE}"
+	fi
 	exit 0
 elif [ "${1:0:3}" == "-f=" ] || [ "${1:0:7}" == "--file=" ]
 then
