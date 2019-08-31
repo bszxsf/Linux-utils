@@ -424,77 +424,55 @@ then
 	TMP_EDITOR=""
 	while [ $# -ne 0 ]
 	do
-		if [ "$1" == "-p" ] || [ "$1" == "--path" ]
-		then
+		case "$1" in
+		-p | --path)
 			PRINT_PATH="1"
-			shift
-			continue
-		fi
-		if [ "$1" == "-f" ] || [ "$1" == "--file" ]
-		then
+			;;
+		-f | --file)
 			if [ -z "${TMP_LOGFILE}" ]
 			then
 				PRINT_FILE="1"
 			fi
-			shift
-			continue
-		fi
-		if [ "$1" == "-e" ] || [ "$1" == "--editor" ]
-		then
+			;;
+		-e | --editor)
 			if [ -z "${TMP_EDITOR}" ]
 			then
 				PRINT_EDITOR="1"
 			fi
-			shift
-			continue
-		fi
-		if [ "$1" == "--force-c" ]
-		then
+			;;
+		--force-c)
 			if [ -z "${TMP_FORCE_C}" ]
 			then
 				PRINT_FORCE_C="1"
 			fi
-			shift
-			continue
-		fi
-		if [ "${1:0:3}" == "-f=" ]
-		then
+			;;
+		-f=*)
 			TMP_LOGFILE="${1#-f=}"
 			PRINT_FILE="0"
-			shift
-			continue
-		fi
-		if [ "${1:0:7}" == "--file=" ]
-		then
+			;;
+		--file=*)
 			TMP_LOGFILE="${1#--file=}"
 			PRINT_FILE="0"
-			shift
-			continue
-		fi
-		if [ "${1:0:3}" == "-e=" ]
-		then
+			;;
+		-e=*)
 			TMP_EDITOR="${1#-e=}"
 			PRINT_EDITOR="0"
-			shift
-			continue
-		fi
-		if [ "${1:0:9}" == "--editor=" ]
-		then
+			;;
+		--editor=*)
 			TMP_EDITOR="${1#--editor=}"
 			PRINT_EDITOR="0"
-			shift
-			continue
-		fi
-		if [ "${1:0:10}" == "--force-c=" ]
-		then
+			;;
+		--force-c=*)
 			TMP_FORCE_C="${1#--force-c=}"
 			PRINT_FORCE_C="0"
-			shift
-			continue
-		fi
-		>&2 echo "${CMD_NAME}: unrecognized option '$1'"
-		>&2 echo "Try '${CMD_NAME} --help' for more information"
-		exit 12
+			;;
+		*)
+			>&2 echo "${CMD_NAME}: unrecognized option '$1'"
+			>&2 echo "Try '${CMD_NAME} --help' for more information"
+			exit 12
+			;;
+		esac
+		shift
 	done
 	if [ -n "${TMP_LOGFILE}" ]
 	then
@@ -573,7 +551,7 @@ then
 	fi
 	[ -n "${TMP_LOGFILE}" ] && __set_log_file "${TMP_LOGFILE}"
 	exit 0
-elif [ "${FORCE_C}" == "1" ]
+elif [ "${FORCE_C}" == "0" ]
 then
 	echo "[${TIME}]$@" >> "${LOG_FILE}"
 	if [ $? -ne 0 ]
