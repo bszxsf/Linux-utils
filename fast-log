@@ -150,6 +150,8 @@ __init_config(){
 	LOG_FILE="${HOME_DIR}/user.log"
 	echo "editor = vi" >> "${CONFIG_FILE}"
 	EDITOR_NAME="vi"
+	echo "force-c = false" >> "${CONFIG_FILE}"
+	FORCE_C="1"
 	if [ $? -ne 0 ]
 	then
 		>&2 echo "${CMD_NAME}: fatal error: __init_config: failed to initialize config file"
@@ -166,6 +168,22 @@ __read_config(){
 	RAW_CONFIG="$(cat ${CONFIG_FILE})"
 	LOG_FILE="$(__get_value "${RAW_CONFIG}" "file")"
 	EDITOR_NAME="$(__get_value "${RAW_CONFIG}" "editor")"
+	FORCE_C="$(__get_value "${RAW_CONFIG}" "force-c")"
+	if [ -z "${LOG_FILE}" ]
+	then
+		LOG_FILE="${HOME_DIR}/user.log"
+		__write_config
+	fi
+	if [ -z "${EDITOR_NAME}" ]
+	then
+		EDITOR_NAME="vi"
+		__write_config
+	fi
+	if [ -z "${FORCE_C}" ]
+	then
+		FORCE_C="0"
+		__write_config
+	fi
 }
 __write_config(){
 	if ! [ -f "${CONFIG_FILE}" ]
@@ -176,6 +194,7 @@ __write_config(){
 	fi
 	echo "file = ${LOG_FILE}" > "${CONFIG_FILE}"
 	echo "editor = ${EDITOR_NAME}" >> "${CONFIG_FILE}"
+	echo "force-c = ${FORCE_C}" >> "${CONFIG_FILE}"
 	if [ $? -ne 0 ]
 	then
 		>&2 echo "${CMD_NAME}: fatal error: __write_config: echo failed"
@@ -276,6 +295,23 @@ __set_log_file(){
 		fi
 	fi
 }
+__set_force_c(){
+	case "$1" in
+		1 | [Yy][Ee][Ss] | [Tt][Rr][Uu][Ee] | [Yy] | [Tt])
+			FORCE_C="1"
+			__write_config
+		;;
+		0 | [Nn][Oo] | [Ff][Aa][Ll][Ss][Ee] | [Nn] | [Ff])
+			FORCE_C="0"
+			__write_config
+		;;
+		*)
+			>&2 echo "${CMD_NAME}: '$1': invalid boolean value"
+			>&2 echo "Try '${CMD_NAME} --help' for more information"
+			exit 7
+		;;
+	esac
+}
 __check_log_file(){
 	if ! [ -f "${LOG_FILE}" ]
 	then
@@ -284,7 +320,7 @@ __check_log_file(){
 		then
 			>&2 echo "${CMD_NAME}: fatal error: cannot create ${LOG_FILE}"
 			>&2 echo "Failed to open ${LOG_FILE}"
-			exit 7
+			exit 8
 		fi
 	fi
 }
@@ -293,7 +329,7 @@ __check_editor(){
 	then
 		>&2 echo "${CMD_NAME}: fatal error: cannot find ${EDITOR_NAME}"
 		>&2 echo "Cannot open the log file"
-		exit 8
+		exit 9
 	fi
 }
 
@@ -322,6 +358,12 @@ if [ $# -eq 0 ] || ( [ $# -eq 1 ] && [ "$1" == "--config" ] )
 then
 	echo "file = ${LOG_FILE}"
 	echo "editor = ${EDITOR_NAME}"
+	if [ "${FORCE_C}" == "1" ]
+	then
+		echo "force-c = true"
+	else
+		echo "force-c = false"
+	fi
 	echo "config file at ${CONFIG_FILE}"
 	exit 0
 elif [ $# -ge 1 ] && ( [ "$1" == '-h' ] || [ "$1" == '--help' ] )
@@ -339,7 +381,7 @@ then
 	then
 		>&2 echo "${CMD_NAME}: fatal error: cannot write to ${LOG_FILE}"
 		>&2 echo "Failed to clean log contents"
-		exit 9
+		exit 10
 	fi
 	exit 0
 elif [ $# -eq 1 ] && ( [ "$1" == "-o" ] || [ "$1" == "--open" ] )
@@ -359,7 +401,7 @@ then
 	then
 		>&2 echo "${CMD_NAME}: fatal error: echo failed"
 		>&2 echo "Cannot write to ${LOG_FILE}"
-		exit 10
+		exit 11
 	fi
 	exit 0
 elif [ "$1" == "--config" ]
@@ -376,6 +418,7 @@ then
 	fi
 	PRINT_FILE="0"
 	PRINT_EDITOR="0"
+	PRINT_FORCE_C="0"
 	PRINT_PATH="0"
 	TMP_LOGFILE=""
 	TMP_EDITOR=""
@@ -401,6 +444,15 @@ then
 			if [ -z "${TMP_EDITOR}" ]
 			then
 				PRINT_EDITOR="1"
+			fi
+			shift
+			continue
+		fi
+		if [ "$1" == "--force-c" ]
+		then
+			if [ -z "${TMP_FORCE_C}" ]
+			then
+				PRINT_FORCE_C="1"
 			fi
 			shift
 			continue
@@ -433,9 +485,16 @@ then
 			shift
 			continue
 		fi
+		if [ "${1:0:10}" == "--force-c=" ]
+		then
+			TMP_FORCE_C="${1#--force-c=}"
+			PRINT_FORCE_C="0"
+			shift
+			continue
+		fi
 		>&2 echo "${CMD_NAME}: unrecognized option '$1'"
 		>&2 echo "Try '${CMD_NAME} --help' for more information"
-		exit 11
+		exit 12
 	done
 	if [ -n "${TMP_LOGFILE}" ]
 	then
@@ -444,6 +503,10 @@ then
 	if [ -n "${TMP_EDITOR}" ]
 	then
 		__set_editor "${TMP_EDITOR}"
+	fi
+	if [ -n "${TMP_FORCE_C}" ]
+	then
+		__set_force_c "${TMP_FORCE_C}"
 	fi
 	if [ "${PRINT_FILE}" == "1" ]
 	then
@@ -482,7 +545,7 @@ then
 	then
 		>&2 echo "${CMD_NAME}: unrecognized option '$1'"
 		>&2 echo "Try '${CMD_NAME} --help' for more information"
-		exit 12
+		exit 13
 	fi
 	[ -n "${TMP_EDITOR}" ] && __set_editor "${TMP_EDITOR}"
 	__check_editor
@@ -506,20 +569,23 @@ then
 	then
 		>&2 echo "${CMD_NAME}: unrecognized option '$1'"
 		>&2 echo "Try '${CMD_NAME} --help' for more information"
-		exit 13
+		exit 14
 	fi
 	[ -n "${TMP_LOGFILE}" ] && __set_log_file "${TMP_LOGFILE}"
 	exit 0
-else
+elif [ "${FORCE_C}" == "1" ]
+then
 	echo "[${TIME}]$@" >> "${LOG_FILE}"
 	if [ $? -ne 0 ]
 	then
 		>&2 echo "${CMD_NAME}: fatal error: echo failed"
 		>&2 echo "Cannot write to ${LOG_FILE}"
-		exit 14
+		exit 15
 	fi
 	exit 0
+else
+	>&2 echo "${CMD_NAME}: unrecognized option '$1': 'force-c' set to true"
+	>&2 echo "Try '${CMD_NAME} --help' for more information"
+	exit 15
 fi
-exit 125
-#Unexpected branch
 
