@@ -1,10 +1,9 @@
 #!/bin/bash
 __help(){
-	echo "Usage: ${CMD_NAME} [-d|--debug] DIR1 [DIR2...]"
+	echo "Usage: ${CMD_NAME} DIR1 [DIR2...]"
 	echo "       ${CMD_NAME} -h|--help"
 	echo "This script is used to combine or simplify directory names."
 	echo ""
-	echo "  -d, --debug                  Print debug inforation to stderr (&2)"
 	echo "  -h, --help                   Show this help information"
 	echo "  DIR1                         A directory"
 	echo "  DIR2...                      Relative directories in order"
