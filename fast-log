@@ -35,6 +35,11 @@ __help(){
 	echo "      --force                  Force set settings, even if the file doesn't"
 	echo "                               exist. For the option '-f|--file=FILENAME', a new"
 	echo "                               file will be created if possible"
+	echo "      --force-c[=BOOLEAN]      If BOOLEAN is specified, set the force-c"
+	echo "                               function. Otherwise, print the current force-c"
+	echo "                               option. BOOLEAN must be a boolean value, 'true'"
+	echo "                               'yes''1''t''y''false''no''0''f''n' are accepted."
+	echo "                               Not case-sensitive"
 	echo "  -e, --editor[=EDITOR]        If EDITOR is specified, set the default editor"
 	echo "                               to EDITOR. Otherwise, print the current editor"
 	echo "                               name"
@@ -55,7 +60,11 @@ __help(){
 	echo "repeated options are specified with new values and some ones not (e.g. --config"
 	echo "-f=A -f), the ones with no values specified will be ignored, even if the"
 	echo "specified value is null. If neither '--force' nor '-a|--abort' is specified,"
-	echo "cancellations by user input will cause no errors."
+	echo "cancellations by user input will cause no errors. 'force-c' is similar, however"
+	echo "'--force' and '-a|--abort' does nothing on this option. This script will always"
+	echo "abort with an invalid boolean value specified for 'force-c', but '-f|--file'"
+	echo "'-e|--editor' will still set the corresponding properties, but nothing will be"
+	echo "displayed (to stdout). In this case, stderr will output nothing."
 	echo ""
 	echo "Options following '-e|--editor' and '-f|--file':"
 	echo "  -a, --abort                  The same as '-a|--abort' for '--config'"
@@ -90,6 +99,7 @@ __help(){
 	echo "Please note that this script does not check if the editor opened the log file"
 	echo "successfully."
 	echo ""
+	echo "When 'force-c' is set to false:"
 	echo "The option '-c|--content' can be omitted usually, but when you want to record"
 	echo "something like '-c', this can be useful. For example, the following command will"
 	echo "print an empty log (but with a timestamp) to your log file:"
@@ -115,6 +125,10 @@ __help(){
 	echo "Note that these samples show the output to your log file. If the operation"
 	echo "succeed, there should be nothing printed to stdout, unless you specify special"
 	echo "options."
+	echo ""
+	echo "While force-c is enabled (i.e. 'force-c' item set to true in the config file),"
+	echo "you must specify a '-c|--content' option manually to output to your log file."
+	echo "Note that 0 = false and 1 = true for this script."
 	echo ""
 	echo "If you meet any problems, record it, report the issue, and try removing the log"
 	echo "file and the config file (if there is one). The config file is at (script"
@@ -216,7 +230,7 @@ __set_editor(){
 			__write_config
 		elif [ "${FORCE_SETTING}" == "-1" ]
 		then
-			exit 1
+			exit 125
 		else
 			echo "'$1': editor not found"
 			while [ 1 ]
@@ -273,7 +287,7 @@ __set_log_file(){
 			__write_config
 		elif [ "${FORCE_SETTING}" == "-1" ]
 		then
-			exit 1
+			exit 124
 		else
 			echo "'${FILE_ABS_PATH}': file not found"
 			while [ 1 ]
@@ -306,9 +320,7 @@ __set_force_c(){
 			__write_config
 		;;
 		*)
-			>&2 echo "${CMD_NAME}: '$1': invalid boolean value"
-			>&2 echo "Try '${CMD_NAME} --help' for more information"
-			exit 7
+			exit 123
 		;;
 	esac
 }
